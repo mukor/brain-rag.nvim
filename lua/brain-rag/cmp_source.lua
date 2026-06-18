@@ -51,7 +51,10 @@ end
 
 --- Fetch tags async via subprocess (live mode).
 local function fetch_live_async(cfg, callback)
-  vim.system(
+  -- vim.system() raises if the command can't be spawned (e.g. brain_rag_cmd is
+  -- not found on PATH). Guard it so a misconfigured binary degrades to "no
+  -- completions" instead of throwing on every keystroke (TextChangedI).
+  local spawned = pcall(vim.system,
     { cfg.tags.brain_rag_cmd, "tags", "--json" },
     { text = true },
     vim.schedule_wrap(function(obj)
@@ -67,6 +70,10 @@ local function fetch_live_async(cfg, callback)
       end
     end)
   )
+  -- Spawn failed: the async callback never runs, so advance cmp here.
+  if not spawned and callback then
+    callback()
+  end
 end
 
 --- Fetch tags async from JSON file (static mode).
