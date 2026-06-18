@@ -92,6 +92,13 @@ function M.setup(opts)
 
   local cfg = config.get()
 
+  -- Verify the CLI's API version matches what this plugin speaks. Async +
+  -- deferred so it never blocks startup; warns once on a real mismatch.
+  -- Run `:checkhealth brain-rag` for full detail.
+  vim.defer_fn(function()
+    require("brain-rag.version").check()
+  end, 200)
+
   if cfg.tags.enable then
     -- Defer cmp registration: wait for InsertEnter + tick so NvChad's cmp fully loads first
     vim.api.nvim_create_autocmd("InsertEnter", {
