@@ -134,7 +134,7 @@ function M.register()
 
   local snippets = {
     make_snippet(ls, "fmconcept", "concept", { "status: draft" }),
-    make_snippet(ls, "fmreference", "reference", { 'source: ""', "status: draft" }),
+    make_snippet(ls, "fmreference", "reference", { 'source: ""', "summarize: once # once | auto | off", "status: draft" }),
     make_snippet(ls, "fmproject", "project", { "status: active" }),
     make_daily_snippet(ls),
     make_meeting_snippet(ls),

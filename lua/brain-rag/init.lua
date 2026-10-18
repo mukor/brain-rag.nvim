@@ -124,6 +124,10 @@ function M.setup(opts)
     require("brain-rag.tag_sync").setup()
   end
 
+  if cfg.summarize.enable then
+    require("brain-rag.summarize").setup()
+  end
+
   -- Keybinding: create meeting note from current line in daily log
   vim.keymap.set("n", "<leader>zm", function()
     require("brain-rag.util").create_meeting_from_line(cfg.vault_dir)

@@ -21,6 +21,12 @@ M.defaults = {
   tag_sync = {
     enable = true,
   },
+
+  summarize = {
+    enable = true,
+    model = nil, -- Ollama model for :BrainRagSummarize (nil = summary_model in brain-rag's config.yaml)
+    keymap = "<leader>zs", -- set to false to skip the mapping
+  },
 }
 
 local _config = {}
