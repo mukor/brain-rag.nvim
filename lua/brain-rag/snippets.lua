@@ -139,6 +139,7 @@ function M.register()
     make_daily_snippet(ls),
     make_meeting_snippet(ls),
     make_snippet(ls, "fmsnippet", "snippet", { "status: draft" }),
+    make_snippet(ls, "fmnote", "note", { "status: active" }),
   }
 
   ls.add_snippets("markdown", snippets)

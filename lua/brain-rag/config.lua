@@ -15,7 +15,7 @@ M.defaults = {
 
   snippets = {
     enable = true,
-    types = { "concept", "reference", "project", "daily", "meeting", "snippet" },
+    types = { "concept", "reference", "project", "daily", "meeting", "snippet", "note" },
   },
 
   tag_sync = {
