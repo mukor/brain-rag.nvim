@@ -87,14 +87,13 @@ function M.extract_inline_tags(lines, fm_end_line)
     end
 
     if not in_code_block then
-      -- Skip markdown headings
-      if not line:match("^#+ ") then
-        -- Find all #tag patterns (require leading letter, allow word chars and hyphens)
-        for tag in line:gmatch("#(%a[%w_-]*)") do
-          if not seen[tag] then
-            seen[tag] = true
-            tags[#tags + 1] = tag
-          end
+      -- Drop a heading's leading hashes so "## #Pogo notes" still yields Pogo
+      local text = line:gsub("^#+%s+", "")
+      -- Find all #tag patterns (require leading letter, allow word chars and hyphens)
+      for tag in text:gmatch("#(%a[%w_-]*)") do
+        if not seen[tag] then
+          seen[tag] = true
+          tags[#tags + 1] = tag
         end
       end
     end
