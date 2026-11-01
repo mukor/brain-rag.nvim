@@ -61,7 +61,7 @@ end
 
 --- The date that a query typed after "due:" means, or nil while it's
 --- incomplete or invalid (the calendar then keeps showing the last good date).
----@param query string
+---@param query string|nil
 ---@param today table {y, m, d}
 ---@return table|nil {y, m, d}
 function M.parse(query, today)
@@ -203,7 +203,8 @@ end
 
 --- "due:" and what follows it, ending at the cursor, if the text before the
 --- cursor ends that way. "due" must not follow a letter or digit ("overdue:").
----@return integer|nil start byte (0-based), string|nil query
+---@return integer|nil start byte where "due:" begins (0-based)
+---@return string|nil query what follows "due:"
 function M.match(text_before_cursor)
   local start, query = text_before_cursor:match("()due:([%w%+%-]*)$")
   if not start then
@@ -217,6 +218,19 @@ end
 
 -- The open picker (one at a time)
 
+---@class BrainRagDueSession
+---@field buf integer
+---@field row integer cursor row (1-based) when it opened
+---@field start integer byte column (0-based) where "due:" begins
+---@field offset integer days moved with the arrow keys
+---@field query? string what follows "due:"
+---@field parsed? table the date `query` means, if it means one
+---@field last? table the last date a query meant (kept while one is incomplete)
+---@field win? integer the calendar's floating window
+---@field float_buf? integer
+---@field saved_maps? table<string, table> buffer-local mappings to restore
+
+---@type BrainRagDueSession|nil
 local session = nil
 local ns = vim.api.nvim_create_namespace("brain_rag_due")
 local KEYS = { "<Tab>", "<CR>", "<Left>", "<Right>", "<Up>", "<Down>" }
@@ -225,25 +239,27 @@ local function settings()
   return vim.tbl_extend("force", { week_start = "sunday" }, config.get().due or {})
 end
 
-local function current_target()
-  local base = session.parsed or session.last or M.today()
-  return M.add_days(base, session.offset)
+---@param s BrainRagDueSession
+local function current_target(s)
+  local base = s.parsed or s.last or M.today()
+  return M.add_days(base, s.offset)
 end
 
-local function render()
-  local target = current_target()
+---@param s BrainRagDueSession
+local function render(s)
+  local target = current_target(s)
   local lines, highlights = M.calendar(target, M.today(), settings().week_start)
-  if not session.float_buf or not vim.api.nvim_buf_is_valid(session.float_buf) then
-    session.float_buf = vim.api.nvim_create_buf(false, true)
+  if not s.float_buf or not vim.api.nvim_buf_is_valid(s.float_buf) then
+    s.float_buf = vim.api.nvim_create_buf(false, true)
   end
-  vim.api.nvim_buf_set_lines(session.float_buf, 0, -1, false, lines)
-  vim.api.nvim_buf_clear_namespace(session.float_buf, ns, 0, -1)
+  vim.api.nvim_buf_set_lines(s.float_buf, 0, -1, false, lines)
+  vim.api.nvim_buf_clear_namespace(s.float_buf, ns, 0, -1)
   for _, h in ipairs(highlights) do
-    vim.api.nvim_buf_set_extmark(session.float_buf, ns, h[1], h[2], { end_col = h[3], hl_group = h[4] })
+    vim.api.nvim_buf_set_extmark(s.float_buf, ns, h[1], h[2], { end_col = h[3], hl_group = h[4] })
   end
   local line = vim.api.nvim_get_current_line()
   local cursor = vim.api.nvim_win_get_cursor(0)[2]
-  local shift = vim.fn.strdisplaywidth(line:sub(session.start + 1, cursor))
+  local shift = vim.fn.strdisplaywidth(line:sub(s.start + 1, cursor))
   local opts = {
     relative = "cursor",
     row = 1,
@@ -255,21 +271,22 @@ local function render()
     focusable = false,
     zindex = 60,
   }
-  if session.win and vim.api.nvim_win_is_valid(session.win) then
-    vim.api.nvim_win_set_config(session.win, opts)
+  if s.win and vim.api.nvim_win_is_valid(s.win) then
+    vim.api.nvim_win_set_config(s.win, opts)
   else
-    session.win = vim.api.nvim_open_win(session.float_buf, false, opts)
+    s.win = vim.api.nvim_open_win(s.float_buf, false, opts)
   end
 end
 
-local function restore_keys()
-  for lhs, saved in pairs(session.saved_maps or {}) do
-    pcall(vim.keymap.del, "i", lhs, { buffer = session.buf })
+---@param s BrainRagDueSession
+local function restore_keys(s)
+  for lhs, saved in pairs(s.saved_maps or {}) do
+    pcall(vim.keymap.del, "i", lhs, { buffer = s.buf })
     if saved and not vim.tbl_isempty(saved) then
       pcall(vim.fn.mapset, "i", false, saved)
     end
   end
-  session.saved_maps = nil
+  s.saved_maps = nil
 end
 
 function M.close()
@@ -282,7 +299,7 @@ function M.close()
   if session.float_buf and vim.api.nvim_buf_is_valid(session.float_buf) then
     vim.api.nvim_buf_delete(session.float_buf, { force = true })
   end
-  restore_keys()
+  restore_keys(session)
   session = nil
 end
 
@@ -291,7 +308,7 @@ function M.accept()
   if not session then
     return
   end
-  local date = M.format(current_target())
+  local date = M.format(current_target(session))
   local row, cursor = unpack(vim.api.nvim_win_get_cursor(0))
   local stamp = "📅 " .. date
   vim.api.nvim_buf_set_text(session.buf, row - 1, session.start, row - 1, cursor, { stamp })
@@ -305,11 +322,13 @@ local function move(days)
     return
   end
   session.offset = session.offset + days
-  render()
+  render(session)
 end
 
-local function bind_keys(buf)
-  session.saved_maps = {}
+---@param s BrainRagDueSession
+---@param buf integer
+local function bind_keys(s, buf)
+  s.saved_maps = {}
   local actions = {
     ["<Tab>"] = M.accept,
     ["<CR>"] = M.accept,
@@ -321,7 +340,7 @@ local function bind_keys(buf)
   for _, lhs in ipairs(KEYS) do
     local existing = vim.fn.maparg(lhs, "i", false, true)
     -- Only buffer-local mappings need restoring; ours shadows global ones
-    session.saved_maps[lhs] = (existing and existing.buffer == 1) and existing or {}
+    s.saved_maps[lhs] = (existing and existing.buffer == 1) and existing or {}
     vim.keymap.set("i", lhs, actions[lhs], { buffer = buf, nowait = true, desc = "brain-rag due date" })
   end
 end
@@ -340,7 +359,7 @@ function M.on_text_changed()
   end
   if not session then
     session = { buf = buf, row = row, start = start, offset = 0 }
-    bind_keys(buf)
+    bind_keys(session, buf)
   end
   if session.query ~= query then
     session.offset = 0
@@ -351,7 +370,7 @@ function M.on_text_changed()
       session.last = parsed
     end
   end
-  render()
+  render(session)
 end
 
 local function attach(group, buf)

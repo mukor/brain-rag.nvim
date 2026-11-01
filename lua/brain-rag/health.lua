@@ -44,7 +44,7 @@ function M.check()
   if status == "ok" then
     h.ok("CLI and plugin are compatible (api " .. version.REQUIRED_API_VERSION .. ").")
   else
-    h.warn(msg)
+    h.warn(msg or "The CLI and plugin API versions differ.")
   end
 end
 
