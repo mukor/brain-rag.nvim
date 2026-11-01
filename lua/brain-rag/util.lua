@@ -69,6 +69,28 @@ function M.parse_frontmatter(lines)
   }
 end
 
+--- The #tags in one line of a note body. Mirrors brain-rag's _INLINE_TAG_RE: a
+--- tag starts with a letter and must not follow a word character, "#" or "/",
+--- so URL fragments (https://example.com/page#section, /#frag) and "a#b" aren't
+--- tags. Inline `code` is skipped. A heading's leading hashes are dropped, so
+--- "## #Pogo notes" still yields Pogo.
+---@param line string
+---@return string[] tags in order (may repeat)
+function M.line_tags(line)
+  local text = line:gsub("^#+%s+", "")
+  text = text:gsub("`[^`]*`", function(code)
+    return string.rep(" ", #code)
+  end)
+  local found = {}
+  for pos, tag in text:gmatch("()#(%a[%w_-]*)") do
+    local prev = pos > 1 and text:sub(pos - 1, pos - 1) or ""
+    if not prev:match("[%w_#/]") then
+      found[#found + 1] = tag
+    end
+  end
+  return found
+end
+
 --- Extract inline #tags from note body lines, skipping frontmatter and code blocks.
 ---@param lines string[] Buffer lines
 ---@param fm_end_line number 1-indexed end of frontmatter
@@ -87,10 +109,7 @@ function M.extract_inline_tags(lines, fm_end_line)
     end
 
     if not in_code_block then
-      -- Drop a heading's leading hashes so "## #Pogo notes" still yields Pogo
-      local text = line:gsub("^#+%s+", "")
-      -- Find all #tag patterns (require leading letter, allow word chars and hyphens)
-      for tag in text:gmatch("#(%a[%w_-]*)") do
+      for _, tag in ipairs(M.line_tags(line)) do
         if not seen[tag] then
           seen[tag] = true
           tags[#tags + 1] = tag

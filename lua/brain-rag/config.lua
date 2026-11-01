@@ -27,6 +27,19 @@ M.defaults = {
     model = nil, -- Ollama model for :BrainRagSummarize (nil = summary_model in brain-rag's config.yaml)
     keymap = "<leader>zs", -- set to false to skip the mapping
   },
+
+  -- Type "due:" for a calendar; Tab inserts "📅 YYYY-MM-DD" (a todo's due date for brain-rag)
+  due = {
+    enable = true,
+    week_start = "sunday", -- or "monday"
+    filetypes = { "markdown", "telekasten" },
+  },
+
+  -- Visual mode: link the selection to a URL, a new note or an existing note
+  link = {
+    enable = true,
+    keymap = "<leader>zl", -- set to false to skip the mapping
+  },
 }
 
 local _config = {}
